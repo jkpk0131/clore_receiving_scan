@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>JK Tools</title></head>
+<body>
+<ul id="list"></ul>
+<script>
+fetch('manifest.json')
+  .then(r => r.json())
+  .then(tools => {
+    document.getElementById('list').innerHTML = tools
+      .map(t => `<li><a href="${t.file}">${t.name}</a></li>`)
+      .join('');
+  });
+</script>
+</body></html>
