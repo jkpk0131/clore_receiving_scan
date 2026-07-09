@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Photo Marker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#141414;
+    --muted:#756F63;
+    --bg:#F2F1EE;
+    --card:#EDEBE4;
+    --border:#E4E1D8;
+    --green:#2D3E2C;
+    --green-hover:#1F2B1E;
+    --lime:#E4FD97;
+  }
+  *{ box-sizing:border-box; }
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:'Space Grotesk', sans-serif;
+    min-height:100vh;
+  }
+  .app{
+    min-height:100vh; display:flex; flex-direction:column; align-items:center;
+    gap:18px; padding:26px 18px;
+  }
+  .mono{ font-family:'IBM Plex Mono', monospace; }
+  .lc{ width:16px; height:16px; display:inline-block; flex-shrink:0; }
+  .lc-sm{ width:13px; height:13px; }
+
+  /* header */
+  .toolbar{ display:flex; align-items:center; gap:14px; flex-wrap:wrap; width:100%; max-width:960px; }
+  .brand{ display:flex; align-items:center; gap:9px; margin-right:auto; }
+  .brand-icon{ width:30px; height:30px; border-radius:9px; background:var(--green); color:#fff; display:flex; align-items:center; justify-content:center; }
+  .brand-title{ font-size:17px; font-weight:700; letter-spacing:-0.01em; }
+  .count-wrap{ display:flex; align-items:baseline; gap:8px; }
+  .count-label{ font-size:11px; font-weight:600; letter-spacing:0.09em; text-transform:uppercase; color:var(--muted); }
+  .count-val{ font-size:22px; font-weight:600; }
+
+  .segmented{ display:flex; border:1px solid var(--border); border-radius:14px; overflow:hidden; background:#fff; }
+  .seg-btn{ display:inline-flex; align-items:center; gap:6px; border:none; background:transparent; color:var(--ink);
+    font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:13px; padding:9px 14px; cursor:pointer; }
+  .seg-btn + .seg-btn{ border-left:1px solid var(--border); }
+  .seg-btn.active{ background:var(--green); color:#fff; }
+  .seg-btn:not(.active):hover{ background:var(--card); }
+
+  .btn{ display:inline-flex; align-items:center; gap:7px; font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:13px;
+    padding:9px 15px; border-radius:14px; cursor:pointer; border:1px solid transparent; }
+  .btn-primary{ background:var(--green); color:#fff; }
+  .btn-primary:hover{ background:var(--green-hover); }
+  .btn-ghost{ background:#fff; color:var(--ink); border-color:var(--border); }
+  .btn-ghost:hover{ background:var(--card); }
+  .btn-group{ display:flex; align-items:center; gap:10px; padding-left:14px; border-left:1px solid var(--border); }
+
+  /* body layout */
+  .body-row{ display:flex; gap:18px; width:100%; max-width:960px; align-items:flex-start; }
+  .stage-col{ display:flex; flex-direction:column; gap:16px; flex:1 1 auto; min-width:0; }
+
+  .sidebar{ flex:0 0 148px; display:flex; flex-direction:column; gap:11px; max-height:78vh; overflow-y:auto; padding:2px; }
+  .sidebar-label{ font-size:11px; font-weight:600; letter-spacing:0.09em; text-transform:uppercase; color:var(--muted); padding:2px 2px 0; }
+  .sidebar-empty{ font-size:12px; line-height:1.55; color:var(--muted); text-align:center; padding:18px 10px; border:1px dashed #C9C4B8; border-radius:14px; }
+  .thumb{ position:relative; border-radius:12px; overflow:hidden; cursor:pointer; background:var(--card); aspect-ratio:1;
+    outline:2px solid transparent; outline-offset:-2px; }
+  .thumb.active{ outline-color:var(--green); }
+  .thumb img{ width:100%; height:100%; object-fit:cover; display:block; -webkit-user-drag:none; }
+  .thumb-badge{ position:absolute; top:6px; left:6px; display:inline-flex; align-items:center; justify-content:center;
+    min-width:20px; height:20px; padding:0 5px; background:var(--card); color:var(--muted); font-weight:600; font-size:11px; border-radius:7px; }
+  .thumb-badge.has{ background:var(--green); color:#fff; }
+  .thumb-remove{ position:absolute; top:5px; right:5px; width:22px; height:22px; border:none; border-radius:50%;
+    background:rgba(20,20,20,0.62); color:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; }
+
+  .stage{ flex:1 1 auto; position:relative; min-height:440px; border-radius:14px; overflow:hidden;
+    box-shadow:0 1px 0 var(--border); outline:2px solid transparent; outline-offset:-2px; cursor:crosshair;
+    background:#EDEBE4; display:flex; align-items:center; justify-content:center; transition:outline-color .12s;
+    touch-action:none; user-select:none; }
+  .stage.drop-active{ outline-color:var(--lime); }
+  .stage img.stage-img{ display:block; width:100%; height:auto; user-select:none; -webkit-user-drag:none; }
+  .empty-state{ padding:64px 24px; text-align:center; color:var(--muted); pointer-events:none; display:flex; flex-direction:column; align-items:center; gap:14px; }
+  .empty-state-title{ font-weight:500; font-size:15px; line-height:1.55; color:var(--ink); }
+  .empty-state-sub{ color:var(--muted); font-weight:400; }
+
+  .item-marker{ position:absolute; transform:translate(-50%,-50%); min-width:32px; height:32px; padding:0 8px;
+    border-radius:16px; border:2px solid #fff; display:flex; align-items:center; justify-content:center;
+    font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:15px; box-shadow:0 2px 8px rgba(20,20,20,0.35);
+    cursor:grab; touch-action:none; }
+  .item-marker:active{ cursor:grabbing; }
+
+  .item-box{ position:absolute; border:2.5px solid; border-radius:6px; cursor:grab; touch-action:none;
+    box-shadow:0 2px 8px rgba(20,20,20,0.18); }
+  .item-box:active{ cursor:grabbing; }
+  .box-label{ position:absolute; top:-13px; left:-13px; min-width:26px; height:26px; padding:0 6px; border-radius:13px;
+    border:2px solid #fff; display:flex; align-items:center; justify-content:center; font-family:'IBM Plex Mono',monospace;
+    font-weight:600; font-size:13px; box-shadow:0 2px 6px rgba(20,20,20,0.3); pointer-events:none; }
+  .resize-handle{ position:absolute; right:-6px; bottom:-6px; width:13px; height:13px; border-radius:4px;
+    border:2px solid #fff; cursor:nwse-resize; box-shadow:0 1px 4px rgba(20,20,20,0.35); }
+
+  .box-preview{ position:absolute; border:2px dashed var(--green); border-radius:6px; background:rgba(45,62,44,0.12);
+    pointer-events:none; display:none; }
+
+  .hints{ display:flex; align-items:center; gap:20px; flex-wrap:wrap; justify-content:center; font-size:12.5px; color:var(--muted); }
+  .hint{ display:inline-flex; align-items:center; gap:6px; }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+
+  <div class="toolbar">
+    <div class="brand">
+      <span class="brand-icon">${ICON.hash}</span>
+      <span class="brand-title">Photo Marker</span>
+    </div>
+
+    <div class="count-wrap">
+      <span class="count-label">Markers</span>
+      <span class="count-val mono" id="countVal">00</span>
+    </div>
+
+    <div class="segmented" id="toolToggle">
+      <button type="button" class="seg-btn active" id="toolPoint">${ICON.mousePointer} Pin</button>
+      <button type="button" class="seg-btn" id="toolBox">${ICON.square} Region</button>
+    </div>
+
+    <div class="btn-group">
+      <label class="btn btn-primary">
+        ${ICON.imagePlus} Add photos
+        <input type="file" accept="image/*" multiple style="display:none" id="fileInput">
+      </label>
+      <button type="button" class="btn btn-ghost" id="downloadBtn">${ICON.download} Download</button>
+      <button type="button" class="btn btn-ghost" id="clearBtn">${ICON.eraser} Clear numbers</button>
+    </div>
+  </div>
+
+  <div class="body-row">
+    <div class="stage-col">
+      <div class="stage" id="stage">
+        <div class="empty-state" id="emptyState">
+          ${ICON.images}
+          <div class="empty-state-title">Drag one or more photos here<br><span class="empty-state-sub">then pick one on the left to number it</span><br><span class="empty-state-sub">or paste a screenshot (Ctrl/Cmd+V)</span></div>
+        </div>
+        <img class="stage-img" id="stageImg" style="display:none">
+        <div class="box-preview" id="boxPreview"></div>
+      </div>
+
+      <div class="hints" id="hints"></div>
+    </div>
+
+    <div class="sidebar" id="sidebar">
+      <div class="sidebar-label">Photos</div>
+      <div class="sidebar-empty" id="sidebarEmpty">Drag photos in, or use Add photos</div>
+    </div>
+  </div>
+
+</div>
+
+<canvas id="sampleCanvas" style="display:none"></canvas>
+
+<script>
+/* ---------- inline icons (no external icon CDN, always renders) ---------- */
+const ICON = {
+  hash: '<svg class="lc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18"/></svg>',
+  imagePlus: '<svg class="lc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="15" height="15" rx="2"/><circle cx="8" cy="10" r="1.4" fill="currentColor" stroke="none"/><path d="M4 17l4.2-4.2a1.8 1.8 0 0 1 2.5 0L15 17"/><path d="M18 3v6M15 6h6"/></svg>',
+  eraser: '<svg class="lc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20H8l-6-6a2 2 0 0 1 0-2.8l10-10a2 2 0 0 1 2.8 0l6 6a2 2 0 0 1 0 2.8L12 18"/><path d="M6 12l6 6"/></svg>',
+  x: '<svg class="lc lc-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>',
+  images: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:38px;height:38px;"><path d="M10.3 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10l-3.1-3.1a2 2 0 0 0-2.814.014L6 21"/><path d="m14 19.5 3-3 3 3"/><path d="M17 22v-5.5"/><circle cx="9" cy="9" r="2"/></svg>',
+  move: '<svg class="lc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M2 12h20M5 9 2 12l3 3M19 9l3 3-3 3M9 5l3-3 3 3M9 19l3 3 3-3"/></svg>',
+  trash: '<svg class="lc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>',
+  mousePointer: '<svg class="lc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3l7.07 16.97 2.51-7.39 7.39-2.51z"/></svg>',
+  square: '<svg class="lc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>',
+  click: '<svg class="lc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4l7 17 2-7 7-2z"/><path d="M14 3v3M4 14h3M6.5 6.5l2 2"/></svg>',
+  drag: '<svg class="lc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="9" height="9" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5" stroke-dasharray="3 3"/></svg>',
+  download: '<svg class="lc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0-4-4m4 4 4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>',
+  clipboard: '<svg class="lc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M9 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-3"/></svg>'
+};
+document.getElementById('app').innerHTML = document.getElementById('app').innerHTML
+  .replace(/\$\{ICON\.(\w+)\}/g, (_, k) => ICON[k] || '');
+
+/* ---------- state ---------- */
+const state = { images: [], activeId: null, tool: 'point' };
+let seq = 0;
+
+const stage = document.getElementById('stage');
+const stageImg = document.getElementById('stageImg');
+const emptyState = document.getElementById('emptyState');
+const boxPreview = document.getElementById('boxPreview');
+const sidebar = document.getElementById('sidebar');
+const sidebarEmpty = document.getElementById('sidebarEmpty');
+const countVal = document.getElementById('countVal');
+const hints = document.getElementById('hints');
+const toolPointBtn = document.getElementById('toolPoint');
+const toolBoxBtn = document.getElementById('toolBox');
+
+function getActive(){ return state.images.find(i => i.id === state.activeId); }
+function clampPct(v){ return Math.max(0, Math.min(100, v)); }
+function hexToRgba(hex, a){
+  const v = hex.replace('#','');
+  const r = parseInt(v.substring(0,2),16), g = parseInt(v.substring(2,4),16), b = parseInt(v.substring(4,6),16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+/* ---------- auto-contrast color sampling ----------
+   Samples the pixels under a marker/region and picks whichever brand
+   color (dark green vs lime) contrasts more against that background.
+   Runs automatically on create + on every drag/resize — no manual choice needed. */
+const sampleCanvas = document.getElementById('sampleCanvas');
+const sampleCtx = sampleCanvas.getContext('2d', { willReadFrequently: true });
+let sampledForId = null;
+
+function ensureSampleReady(){
+  const a = getActive();
+  if (!a || !stageImg.complete || !stageImg.naturalWidth) return false;
+  if (sampledForId === a.id + '|' + stageImg.src) return true;
+  sampleCanvas.width = stageImg.naturalWidth;
+  sampleCanvas.height = stageImg.naturalHeight;
+  sampleCtx.drawImage(stageImg, 0, 0);
+  sampledForId = a.id + '|' + stageImg.src;
+  return true;
+}
+
+function autoColorAt(xPct, yPct, wPct, hPct){
+  const fallback = { bg:'#2D3E2C', ink:'#FFFFFF' };
+  if (!ensureSampleReady()) return fallback;
+  const W = sampleCanvas.width, H = sampleCanvas.height;
+  const sw = Math.min(220, Math.max(8, Math.round(W * wPct / 100)));
+  const sh = Math.min(220, Math.max(8, Math.round(H * hPct / 100)));
+  let px = Math.round(W * xPct / 100 - sw / 2);
+  let py = Math.round(H * yPct / 100 - sh / 2);
+  px = Math.max(0, Math.min(W - sw, px));
+  py = Math.max(0, Math.min(H - sh, py));
+  let data;
+  try { data = sampleCtx.getImageData(px, py, sw, sh).data; }
+  catch (e) { return fallback; }
+  let total = 0, count = 0;
+  for (let i = 0; i < data.length; i += 16) { // stride-sample for speed
+    total += 0.299*data[i] + 0.587*data[i+1] + 0.114*data[i+2];
+    count++;
+  }
+  if (!count) return fallback;
+  const avgLum = total / count;
+  // light background -> dark green marker · dark background -> lime marker
+  return avgLum >= 140 ? { bg:'#2D3E2C', ink:'#FFFFFF' } : { bg:'#E4FD97', ink:'#141414' };
+}
+
+/* ---------- file loading ---------- */
+function loadFiles(files){
+  const list = Array.from(files || []).filter(f => f.type && f.type.startsWith('image/'));
+  list.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const id = 'img' + (++seq);
+      state.images.push({ id, src: reader.result, items: [], name: file.name || 'Pasted image' });
+      if (!state.activeId) state.activeId = id;
+      render();
+    };
+    reader.readAsDataURL(file);
+  });
+}
+document.getElementById('fileInput').addEventListener('change', e => loadFiles(e.target.files));
+
+window.addEventListener('dragover', e => { e.preventDefault(); stage.classList.add('drop-active'); });
+window.addEventListener('dragleave', e => {
+  if (e.relatedTarget === null || !document.body.contains(e.relatedTarget)) stage.classList.remove('drop-active');
+});
+window.addEventListener('drop', e => {
+  e.preventDefault();
+  stage.classList.remove('drop-active');
+  if (e.dataTransfer && e.dataTransfer.files) loadFiles(e.dataTransfer.files);
+});
+
+/* paste a screenshot straight from the clipboard (Ctrl/Cmd+V), anywhere on the page */
+window.addEventListener('paste', e => {
+  const items = (e.clipboardData && e.clipboardData.items) || [];
+  const files = [];
+  for (const item of items) {
+    if (item.kind === 'file' && item.type && item.type.startsWith('image/')) {
+      const blob = item.getAsFile();
+      if (blob) files.push(blob);
+    }
+  }
+  if (files.length) {
+    e.preventDefault();
+    loadFiles(files);
+  }
+});
+
+/* ---------- item creation / mutation ---------- */
+function addMarkerAt(x, y){
+  const a = getActive(); if (!a) return;
+  const color = autoColorAt(x, y, 6, 6);
+  a.items.push({ kind:'marker', id:'m' + (++seq), x, y, color });
+  render();
+}
+function removeItem(id){
+  const a = getActive(); if (!a) return;
+  a.items = a.items.filter(it => it.id !== id);
+  render();
+}
+function removeImage(id){
+  state.images = state.images.filter(im => im.id !== id);
+  if (state.activeId === id) state.activeId = state.images.length ? state.images[0].id : null;
+  render();
+}
+
+/* ---------- drag interactions (closures avoid handler collisions) ---------- */
+function beginMoveMarker(id, e){
+  e.stopPropagation(); e.preventDefault();
+  const a = getActive(); const item = a.items.find(it => it.id === id); if (!item) return;
+  function move(ev){
+    const rect = stage.getBoundingClientRect();
+    item.x = clampPct((ev.clientX - rect.left) / rect.width * 100);
+    item.y = clampPct((ev.clientY - rect.top) / rect.height * 100);
+    item.color = autoColorAt(item.x, item.y, 6, 6);
+    renderStage();
+  }
+  function up(){ window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); }
+  window.addEventListener('pointermove', move);
+  window.addEventListener('pointerup', up);
+}
+
+function beginMoveBox(id, e){
+  e.stopPropagation(); e.preventDefault();
+  const a = getActive(); const item = a.items.find(it => it.id === id); if (!item) return;
+  const rect = stage.getBoundingClientRect();
+  const startClientX = e.clientX, startClientY = e.clientY;
+  const origX = item.x, origY = item.y;
+  function move(ev){
+    const dxPct = (ev.clientX - startClientX) / rect.width * 100;
+    const dyPct = (ev.clientY - startClientY) / rect.height * 100;
+    item.x = Math.max(0, Math.min(100 - item.w, origX + dxPct));
+    item.y = Math.max(0, Math.min(100 - item.h, origY + dyPct));
+    item.color = autoColorAt(item.x + item.w / 2, item.y + item.h / 2, item.w, item.h);
+    renderStage();
+  }
+  function up(){ window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); }
+  window.addEventListener('pointermove', move);
+  window.addEventListener('pointerup', up);
+}
+
+function beginResizeBox(id, e){
+  e.stopPropagation(); e.preventDefault();
+  const a = getActive(); const item = a.items.find(it => it.id === id); if (!item) return;
+  const rect = stage.getBoundingClientRect();
+  const startClientX = e.clientX, startClientY = e.clientY;
+  const origW = item.w, origH = item.h;
+  function move(ev){
+    const dwPct = (ev.clientX - startClientX) / rect.width * 100;
+    const dhPct = (ev.clientY - startClientY) / rect.height * 100;
+    item.w = Math.max(1.5, Math.min(100 - item.x, origW + dwPct));
+    item.h = Math.max(1.5, Math.min(100 - item.y, origH + dhPct));
+    item.color = autoColorAt(item.x + item.w / 2, item.y + item.h / 2, item.w, item.h);
+    renderStage();
+  }
+  function up(){ window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); }
+  window.addEventListener('pointermove', move);
+  window.addEventListener('pointerup', up);
+}
+
+function updatePreviewRect(x0, y0, x1, y1){
+  const left = Math.min(x0, x1), top = Math.min(y0, y1), w = Math.abs(x1 - x0), h = Math.abs(y1 - y0);
+  boxPreview.style.left = left + '%';
+  boxPreview.style.top = top + '%';
+  boxPreview.style.width = w + '%';
+  boxPreview.style.height = h + '%';
+  const c = autoColorAt(left + w / 2, top + h / 2, Math.max(w, 4), Math.max(h, 4));
+  boxPreview.style.borderColor = c.bg;
+  boxPreview.style.background = hexToRgba(c.bg, 0.14);
+}
+
+function beginCreateBox(e){
+  e.preventDefault();
+  const rect = stage.getBoundingClientRect();
+  const startX = clampPct((e.clientX - rect.left) / rect.width * 100);
+  const startY = clampPct((e.clientY - rect.top) / rect.height * 100);
+  boxPreview.style.display = 'block';
+  updatePreviewRect(startX, startY, startX, startY);
+  function move(ev){
+    const curX = clampPct((ev.clientX - rect.left) / rect.width * 100);
+    const curY = clampPct((ev.clientY - rect.top) / rect.height * 100);
+    updatePreviewRect(startX, startY, curX, curY);
+  }
+  function up(ev){
+    window.removeEventListener('pointermove', move);
+    window.removeEventListener('pointerup', up);
+    boxPreview.style.display = 'none';
+    const curX = clampPct((ev.clientX - rect.left) / rect.width * 100);
+    const curY = clampPct((ev.clientY - rect.top) / rect.height * 100);
+    const x0 = Math.min(startX, curX), x1 = Math.max(startX, curX);
+    const y0 = Math.min(startY, curY), y1 = Math.max(startY, curY);
+    const w = x1 - x0, h = y1 - y0;
+    if (w >= 1.5 && h >= 1.5) {
+      const a = getActive();
+      const color = autoColorAt(x0 + w / 2, y0 + h / 2, w, h);
+      a.items.push({ kind:'box', id:'b' + (++seq), x:x0, y:y0, w, h, color });
+      render();
+    }
+  }
+  window.addEventListener('pointermove', move);
+  window.addEventListener('pointerup', up);
+}
+
+/* stage pointerdown: routes to move / resize / create-region */
+stage.addEventListener('pointerdown', e => {
+  if (!getActive()) return;
+  const markerEl = e.target.closest('.item-marker');
+  if (markerEl) { beginMoveMarker(markerEl.dataset.id, e); return; }
+  const handleEl = e.target.closest('.resize-handle');
+  if (handleEl) { beginResizeBox(handleEl.closest('.item-box').dataset.id, e); return; }
+  const boxEl = e.target.closest('.item-box');
+  if (boxEl) { beginMoveBox(boxEl.dataset.id, e); return; }
+  if (state.tool === 'box') beginCreateBox(e);
+});
+
+/* plain click (no drag) adds a pin — only in point mode */
+stage.addEventListener('click', e => {
+  if (state.tool !== 'point' || !getActive()) return;
+  if (e.target.closest('.item-marker') || e.target.closest('.item-box')) return;
+  const rect = stage.getBoundingClientRect();
+  addMarkerAt(
+    clampPct((e.clientX - rect.left) / rect.width * 100),
+    clampPct((e.clientY - rect.top) / rect.height * 100)
+  );
+});
+
+/* ---------- tool toggle ---------- */
+toolPointBtn.addEventListener('click', () => { state.tool = 'point'; updateToolUI(); });
+toolBoxBtn.addEventListener('click', () => { state.tool = 'box'; updateToolUI(); });
+function updateToolUI(){
+  toolPointBtn.classList.toggle('active', state.tool === 'point');
+  toolBoxBtn.classList.toggle('active', state.tool === 'box');
+  const pasteHint = `<span class="hint">${ICON.clipboard} Paste a screenshot (Ctrl/Cmd+V)</span>`;
+  hints.innerHTML = (state.tool === 'point'
+    ? `<span class="hint">${ICON.click} Click empty space to add a pin</span>
+       <span class="hint">${ICON.move} Drag a pin to move</span>
+       <span class="hint">${ICON.trash} Double-click to remove</span>`
+    : `<span class="hint">${ICON.drag} Drag to draw a region</span>
+       <span class="hint">${ICON.move} Drag a region to move · corner handle to resize</span>
+       <span class="hint">${ICON.trash} Double-click to remove</span>`
+  ) + pasteHint;
+}
+
+document.getElementById('clearBtn').addEventListener('click', () => {
+  const a = getActive(); if (!a) return;
+  a.items = [];
+  render();
+});
+
+/* ---------- high-resolution export ----------
+   Draws the active photo at its ORIGINAL pixel resolution (not the
+   scaled-down on-screen size) onto an offscreen canvas, then draws every
+   marker/region at the same relative position, scaled proportionally so
+   they look identical to the on-screen version — just full quality. */
+async function exportActiveImage(){
+  const a = getActive();
+  if (!a || !stageImg.complete || !stageImg.naturalWidth) return;
+  if (document.fonts && document.fonts.ready) { try { await document.fonts.ready; } catch (e) {} }
+
+  const W = stageImg.naturalWidth, H = stageImg.naturalHeight;
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(stageImg, 0, 0, W, H);
+
+  const scale = Math.max(0.6, W / 900); // keeps marker size proportional at any resolution
+  const monoFont = w => `600 ${Math.round(w)}px 'IBM Plex Mono', monospace`;
+
+  a.items.forEach((item, idx) => {
+    const num = String(idx + 1);
+    if (item.kind === 'marker') {
+      const cx = item.x / 100 * W, cy = item.y / 100 * H;
+      const r = 17 * scale;
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fillStyle = item.color.bg; ctx.fill();
+      ctx.lineWidth = 2.4 * scale; ctx.strokeStyle = '#ffffff'; ctx.stroke();
+      ctx.fillStyle = item.color.ink; ctx.font = monoFont(15 * scale);
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(num, cx, cy + scale);
+    } else {
+      const x = item.x / 100 * W, y = item.y / 100 * H, w = item.w / 100 * W, h = item.h / 100 * H;
+      ctx.fillStyle = hexToRgba(item.color.bg, 0.16); ctx.fillRect(x, y, w, h);
+      ctx.lineWidth = 3 * scale; ctx.strokeStyle = item.color.bg; ctx.strokeRect(x, y, w, h);
+
+      const lr = 14 * scale;
+      ctx.beginPath(); ctx.arc(x, y, lr, 0, Math.PI * 2);
+      ctx.fillStyle = item.color.bg; ctx.fill();
+      ctx.lineWidth = 2.4 * scale; ctx.strokeStyle = '#ffffff'; ctx.stroke();
+      ctx.fillStyle = item.color.ink; ctx.font = monoFont(13 * scale);
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(num, x, y + scale);
+    }
+  });
+
+  const base = (a.name || 'photo').replace(/\.[^.]+$/, '');
+  const link = document.createElement('a');
+  link.download = `${base}-marked.png`;
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+}
+document.getElementById('downloadBtn').addEventListener('click', exportActiveImage);
+
+/* ---------- render ---------- */
+function render(){ renderSidebar(); renderStage(); }
+
+function renderSidebar(){
+  sidebar.querySelectorAll('.thumb').forEach(el => el.remove());
+  sidebarEmpty.style.display = state.images.length ? 'none' : 'block';
+  state.images.forEach(im => {
+    const el = document.createElement('div');
+    el.className = 'thumb' + (im.id === state.activeId ? ' active' : '');
+    el.innerHTML = `
+      <img src="${im.src}">
+      <span class="thumb-badge${im.items.length ? ' has' : ''}">${im.items.length}</span>
+      <button type="button" class="thumb-remove">${ICON.x}</button>`;
+    el.addEventListener('click', () => { state.activeId = im.id; render(); });
+    el.querySelector('.thumb-remove').addEventListener('click', ev => { ev.stopPropagation(); removeImage(im.id); });
+    sidebar.appendChild(el);
+  });
+}
+
+function renderStage(){
+  stage.querySelectorAll('.item-marker, .item-box').forEach(el => el.remove());
+  const a = getActive();
+  emptyState.style.display = a ? 'none' : 'flex';
+  stageImg.style.display = a ? 'block' : 'none';
+  countVal.textContent = String(a ? a.items.length : 0).padStart(2, '0');
+  if (!a) return;
+  if (stageImg.src !== a.src) stageImg.src = a.src;
+
+  a.items.forEach((item, idx) => {
+    const num = idx + 1;
+    if (item.kind === 'marker') {
+      const el = document.createElement('div');
+      el.className = 'item-marker';
+      el.dataset.id = item.id;
+      el.style.left = item.x + '%';
+      el.style.top = item.y + '%';
+      el.style.background = item.color.bg;
+      el.style.color = item.color.ink;
+      el.textContent = num;
+      el.addEventListener('dblclick', ev => { ev.stopPropagation(); removeItem(item.id); });
+      stage.appendChild(el);
+    } else {
+      const el = document.createElement('div');
+      el.className = 'item-box';
+      el.dataset.id = item.id;
+      el.style.left = item.x + '%';
+      el.style.top = item.y + '%';
+      el.style.width = item.w + '%';
+      el.style.height = item.h + '%';
+      el.style.borderColor = item.color.bg;
+      el.style.background = hexToRgba(item.color.bg, 0.14);
+      el.addEventListener('dblclick', ev => { ev.stopPropagation(); removeItem(item.id); });
+
+      const label = document.createElement('div');
+      label.className = 'box-label';
+      label.style.background = item.color.bg;
+      label.style.color = item.color.ink;
+      label.textContent = num;
+      el.appendChild(label);
+
+      const handle = document.createElement('div');
+      handle.className = 'resize-handle';
+      handle.style.background = item.color.bg;
+      el.appendChild(handle);
+
+      stage.appendChild(el);
+    }
+  });
+}
+
+updateToolUI();
+render();
+</script>
+</body>
+</html>
